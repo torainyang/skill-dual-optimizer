@@ -1,0 +1,10 @@
+{
+  "displayName" : "Skill Dual Optimizer",
+  "author" : "Torain",
+  "name" : "skill-dual-optimizer",
+  "description" : "优化和重构现有 skill。用于检查目标 skill 的触发描述、SKILL.md 工作流、确认门槛、渐进式披露，以及 references/scripts/assets 的组织方式。当用户提到"优化 skill""检查 skill 质量""改进某个 skill""重构技能说明"，或直接说明要优化哪些方面时使用。默认先审查、再出计划、等待用户确认后再修改目标 skill。不适用于从零创建新 skill（请使用 skill-creator）。",
+  "version" : "v1.6",
+  "tags" : [ "研发效能" ],
+  "basedOn" : "ant_skill_center/skill-optimizer v1.2 by 悟鸣",
+  "changelog" : "v1.6: 正式命名为 Skill Dual Optimizer，新增 README.md，归因声明从 SKILL.md 移至 README。v1.3-v1.5: 基于 v1.2 进行 3 轮双视角自审重构，新增 6 个 reference 文件，SKILL.md 完全重写。"
+}
