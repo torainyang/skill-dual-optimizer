@@ -1,141 +1,148 @@
 ---
 name: skill-dual-optimizer
-description: 优化和重构现有 skill。用于检查目标 skill 的触发描述、SKILL.md 工作流、确认门槛、渐进式披露，以及 references/scripts/assets 的组织方式。当用户提到"优化 skill""检查 skill 质量""改进某个 skill""重构技能说明"，或直接说明要优化哪些方面时使用。默认先审查、再出计划、等待用户确认后再修改目标 skill。不适用于从零创建新 skill（请使用 skill-creator）。
+description: 优化和重构现有 skill。诊断问题、出修改计划、确认后安全修改并验证。当用户提到"优化 skill""检查 skill 质量""改进某个 skill""重构技能说明"，或直接说明要优化哪些方面时使用。不适用于从零创建新 skill（请使用 skill-creator）。
 ---
 
 # Skill Dual Optimizer
 
-先审查，再规划，最后在确认后修改。
+诊断可插拔，修改收拢。
 
 ## Gotchas
 
-- 先输出完整审查结论，等用户确认后再开始改文件（审查与修改严格分步）
-- 改动面与用户确认的计划一致，额外发现单独列为"附加建议"
-- 只读取当前审查步骤需要的 reference，按 Step 2 的触发条件逐步加载
-- 用户指定了优化方向时，先围绕该方向完成，再补充少量高价值建议
-- 不要在没确认前修改目标 skill
-- 审查 skill-dual-optimizer 自身时，只做一轮审查，不要递归应用自己的优化流程
+- 审查结论先于文件修改——✓ "计划如下，确认后修改"；✗ 边审查边改文件
+- 改动面与确认的计划一致，额外发现列为"附加建议"——✓ "改了3处+1个附加"；✗ 计划改触发词，实际把工作流也重写了
+- 用户指定方向时先围绕该方向完成——✓ "改了 description，另发现1个 Gotchas 问题列为附加"；✗ 用户说"改触发"却把整个工作流重写了
+- 审查自身时只做一轮，不递归——✓ 逐条对照一遍就停；✗ 发现自身有问题后又审查审查过程
+- LLM vs 脚本边界是高频误配点，逐步骤判断是否需要语义理解——✓ "字数统计→脚本"；✗ 让 LLM 做精确字数统计
+- 有引用文件时额外检查引用文件健康和异常兜底；没有则跳过
+- 精简时保留动作指令——✓ "逐步骤检查"保留"逐步骤"；✗ 精简为"注意边界"丢失了"逐步骤"动作
+- 修改有先后顺序，先改 references 再改 SKILL.md 中的引用，防孤引用
 
-## 设计模式
+---
 
-本 skill 主要采用：
-- **Reviewer**：先判断目标 skill 的问题，再给诊断
-- **Inversion**：先出计划并等待确认，不直接改文件
-- **Generator（轻度）**：在用户确认后，输出更清晰的 skill 结构或工作流
+## Quick-Fail Flags
+
+以下任一为真 → 标记快速失败，优先修复：
+
+1. description 无法触发目标场景
+2. 工作流中存在必须确认却没有卡住的步骤
+3. 存在互相矛盾的指令
+4. 存在 LLM 无法执行的幻影指令
+5. SKILL.md 超过 5000 字（约 300 行）且未使用 references
+6. 引用文件存在大段重复内容
+7. Gotchas 完全缺失
+
+---
 
 ## 工作流
 
-复制此清单并跟踪进度：
-
 ```text
-优化进度：
-- [ ] 步骤 1：Scope（确定范围）
-- [ ] 步骤 2：Review（审查目标 skill）
-- [ ] 步骤 3：Plan（输出优化计划并等待确认）
-- [ ] 步骤 4：Implement（确认后实施）
-- [ ] 步骤 5：Verify（校验结果）
+- [ ] Phase 1: Diagnose（可插拔）
+- [ ] Phase 2: Plan（确认门控）
+- [ ] Phase 3: Implement（安全修改）
+- [ ] Phase 4: Verify（回归验证）
 ```
 
-### Step 1: Scope（确定范围）
+### Phase 1: Diagnose
 
-先确认目标 skill 和本次优化范围。
+确认目标 skill 和诊断模式，产出问题清单。
 
-- 优先采用用户明确提出的优化方向，例如触发词、description、结构拆分、脚本化、确认流程。
-- 如果用户只说"优化这个 skill"，先做完整审查，再给出分优先级计划。
-- 如果用户明确只要快速诊断（不要修改），跳过 Step 4-5，只输出 Step 3 的审查结论部分。
-- 如果目标 skill 不明确，只问一个最短问题，不要一次追问很多细节。
-- 如果目标 skill 路径不存在或 SKILL.md 为空，立即告知用户并终止，不要猜测内容。
+**Scope 判断**：
 
-### Step 2: Review（审查目标 skill）
+| 用户输入 | 范围 | 诊断模式 |
+|---------|------|---------|
+| "优化/检查/改进 skill-xxx" | 完整审查 | 框架诊断 |
+| "优化 skill-xxx 的触发" | 局部审查 | 框架诊断（仅相关维度） |
+| "深度审计 skill-xxx" | 完整审查 | 专家组诊断 |
+| 用户提供问题清单 | 按清单 | 外部输入 |
+| 目标不明确 | 只问一个最短问题 | — |
+| 路径不存在或 SKILL.md 为空/不可解析 | 告知并终止 | — |
 
-先读目标 skill 的 `SKILL.md`，再按需读取它直接链接的 `references/`、`scripts/`、`assets/`。
+**三种诊断模式**：
 
-- 默认使用 [references/review-checklist.md](references/review-checklist.md) 做审查基线。
-- 默认再结合 [references/skill-design-review-framework.md](references/skill-design-review-framework.md) 判断模式是否匹配、设计是否合理。
-- 需要判断最佳实践取舍时，再读取 [references/技能创作最佳实践 - Claude API Docs.md](<references/技能创作最佳实践 - Claude API Docs.md>)。
-- 当 checklist 发现 ≥2 个〔A〕类问题时，再读取 [references/prompt-engineering-principles.md](references/prompt-engineering-principles.md) 做深度 PE 审查。
-- 当用户要求打分或量化评估时，再读取 [references/quality-rubric.md](references/quality-rubric.md)。
-- 不要为了"审查完整"而把无关 reference 全部读入上下文。
+**模式A 框架诊断**（默认）：
+1. 读目标 skill 的 SKILL.md，再逐个读引用文件
+2. Quick-Fail 检查 → 命中任一条 → 仅产出 Quick-Fail 问题清单，进入 Phase 2
+3. 未快速失败 → 识别 skill 模式（见 references/skill-design-patterns.md），主模式决定审查重心
+4. D1/D2 扫描（见下方），产出完整问题清单
+5. 局部审查 → 仅扫描相关维度，跳过无关项
 
-快速判断（先于详细检查）：
+**模式B 专家组诊断**：按 references/expert-panel-guide.md 启动多专家并行诊断，汇总格式：共识 → 分歧 → 补充
 
-- 当前 skill 属于哪种主模式（Tool Wrapper / Generator / Reviewer / Inversion / Pipeline），模式是否匹配任务
-- description 是否能独立触发，无需阅读 SKILL.md 正文
-- 工作流是否有硬性确认门槛，是否存在必须确认却没卡住的步骤
+**模式C 外部输入**：用户提供问题清单，直接进入 Phase 2
 
-详细检查项见 [references/review-checklist.md](references/review-checklist.md)。
+**问题清单格式**：每条问题含 id / dimension(D1|D2) / severity(P0-P3) / title / location / description / suggestion；meta 含 diagnosis_mode / target_skill / quick_fail
 
-如果用户只要求微调某一部分（例如只改 description、只补 references、只修确认门槛），优先做局部审查，不要擅自把任务升级成整 skill 重构。
+**D1 扫描（上下文与执行可靠性）**：
 
-### Step 3: Plan（输出优化计划并等待确认）
+- ✓ 关键约束在首尾高注意力区 / ✗ 关键规则被埋在中间60%
+- ✓ 规则唯一定义点，执行点一句话引用 / ✗ 同一规则在多处完整定义（重复三原则详见 references/prompt-engineering-principles.md H5）
+- ✓ 高噪音时能提取有效信号 / ✗ 黑话或隐式上下文导致信号丢失
+- ✓ 步骤依赖显式声明，中间产物格式明确 / ✗ 跳步或中间产物丢失
+- ✓ 每个条件分支都有明确出口 / ✗ Quick-Fail 后路径缺失、分支无出口
+- ✓ 字数高效（<5000字或合理使用 references） / ✗ 字数超标且未拆分（定性判断；如需精确统计→脚本）
+- ✓ 按需加载触发条件覆盖所有使用场景 / ✗ 核心流程依赖的文件无法被触发加载
+- ✓ 运行时指令与参考知识边界清晰 / ✗ 方法论/分类学混在 SKILL.md 主文件
+- ✓ 引用文件健康：无增量重复、与 SKILL.md 不重复、脚本 vs 参考分明 / ✗ 引用文件大段重复或缺失
 
-先给诊断，再给计划，不要直接改文件。
+**D2 扫描（认知与决策质量）**：
 
-问题排序规则：
-1. 先修触发失败、确认缺失、流程不可执行的问题
-2. 再修结构臃肿、重复内容、资源组织混乱的问题
-3. 最后处理措辞润色、示例补充、可读性增强
+- ✓ 后1/3步骤有新硬约束，推理可靠 / ✗ 靠后步骤无新约束，推理衰减
+- ✓ 无幻影指令（"默默验证""精确打分"等不可执行指令） / ✗ 存在幻影指令
+- ✓ LLM 做语义判断，脚本做确定性操作 / ✗ LLM 做字数统计/token 计数等确定性操作
+- ✓ 确认门槛硬编码且无遗漏 / ✗ 确认门槛为软约束、缺失、或关键步骤未设卡
+- ✓ 决策树完整：每个分支有出口，Quick-Fail 后有明确路径 / ✗ 分支通向空白或循环
+- ✓ Gotchas 覆盖高频错误且有正向示例（≥3:1） / ✗ Gotchas 裸奔或正负比<3:1
+- ✓ 用户拿到输出可直接行动 / ✗ 需要二次加工或格式不稳定
+- ✓ Verify 覆盖结构和语义（问题修复验证+改动面一致性） / ✗ Verify 只检查格式不检查问题是否修复
 
-输出格式参考 [references/sample-review-output.md](references/sample-review-output.md)。输出必须包含两个部分：
+**按需加载**（进入 Phase 1 时先判断需要加载哪些）：
 
-```markdown
-# Skill 审查结论
+| 触发条件 | 加载文件 |
+|---------|---------|
+| Phase 1 快速判断阶段（每次必读） | references/quality-rubric.md |
+| D2 扫描阶段 | references/prompt-engineering-principles.md |
+| 需要判断内容该拆文件还是保留 | references/skill-design-patterns.md |
+| 首次审查或输出格式拿不准时 | references/sample-review-output.md |
+| 使用专家组诊断模式 | references/expert-panel-guide.md |
 
-## 模式判断
-- 主模式：...
-- 次模式：...
-- 当前判断：模式匹配 / 模式错位 / 模式不清
+### Phase 2: Plan
 
-## 高优先级
-- [问题] 影响触发、正确性或执行稳定性
+LOCK：先诊断再计划，审查结论先于文件修改。
 
-## 中优先级
-- [问题] 影响可维护性、可复用性或上下文成本
+基于问题清单，按优先级排序并生成修改计划。
 
-## 低优先级
-- [问题] 体验提升项，可选
+**问题排序**：执行可靠性/幻觉/遵从性 > 输出可执行性/防护 > 结构/字数效率 > 措辞/可读性
 
-# 优化计划
-1. 修改 [目标文件路径]
-   - 变更内容：
-   - 原因：
-   - 影响范围：仅本文件 / 需同步修改 [其他文件]
-   - 是否受用户指定方向驱动：是/否
+**停止标准**：所有"需修复"项已解决、剩余均为"合格"档且用户无进一步要求时，停止。把执行点强化当无增量重复删掉，比保留一点冗余更危险。
 
-请确认是否按以上计划执行。
-```
+**确认门控**：
+- 输出修改计划，等待用户确认
+- 用户确认 → Phase 3
+- 用户修改要求 → 回到 Phase 2 修改计划
+- 用户否决 → 终止并汇报已有发现
+- 附加建议单独列出，不计入计划改动面
 
-规则：
+计划格式：`修改 [文件] — 变更 / 原因 / 影响范围 / 是否受用户方向驱动`
 
-- 如果用户明确给了优化方向，先围绕这些方向出计划，再补充少量高价值附加建议。
-- 如果发现超出本次范围的大问题，单独列为"额外建议"，不要偷偷扩大改动面。
-- 未获得确认前，不要修改目标 skill。
+### Phase 3: Implement
 
-### Step 4: Implement（确认后实施）
+LOCK：确认后修改，改动面与计划一致。
 
-在用户确认后，再修改目标 skill。
+1. 改前快照：记录原始内容摘要，供 Phase 4 对比
+2. 小步重构：每次只改一个逻辑单元
+3. 执行顺序：先改 references，再改 SKILL.md 中的引用
+4. 保留执行点强化和红线重申（重复三原则详见 references/prompt-engineering-principles.md H5）
+5. 删无增量重复/失效/冲突部分
+6. 异常中止：修改无法执行时标记"无法执行"并汇报，不强行修改
+7. 不确定是否增量重复时，不删除，列为待确认项
 
-- 优先改动计划中已确认的文件。
-- 尽量小步重构；仅在确有收益时拆分新的 `references/`、`scripts/`、`assets/`。
-- 如果新增引用文件，确保它们都直接从目标 `SKILL.md` 链接，避免深层跳转。
-- 保留用户原有有效内容；只删除重复、失效或与新流程冲突的部分。
+### Phase 4: Verify
 
-### Step 5: Verify（校验结果）
+**结构验证**：frontmatter 只含 name + description / name/目录名/触发语义一致 / SKILL.md 比改前更短更清晰 / 引用文件无大段重复（执行点强化和红线重申除外）
 
-改完后至少完成这些校验：
+**语义验证**：问题修复验证（逐条对照计划） / 改动面一致性 / 触发有效性（description 仍命中预期场景）
 
-- frontmatter 只包含 `name` 和 `description`
-- `name`、目录名、触发语义一致
-- `description` 能独立表达触发条件
-- `SKILL.md` 主体比改动前更短、更清晰，且工作流可执行
-- 新增 `references/` 是否只承载细节，没有和 `SKILL.md` 重复大段内容
-- 如有"先审查后确认再修改"的门槛，是否在说明里写清楚
+**回归验证**：Quick-Fail 复检（无新增） / 引用文件可达性
 
-最后向用户汇报：
-
-```markdown
-## 优化完成
-- 已修改：[文件列表]
-- 已落实：[优化方向列表]
-- 遗留风险：[风险列表，无则写"无"]
-```
+汇报：已修改文件 / 已落实方向 / 遗留风险

@@ -2,9 +2,9 @@
   "displayName" : "Skill Dual Optimizer",
   "author" : "Torain",
   "name" : "skill-dual-optimizer",
-  "description" : "优化和重构现有 skill。用于检查目标 skill 的触发描述、SKILL.md 工作流、确认门槛、渐进式披露，以及 references/scripts/assets 的组织方式。当用户提到"优化 skill""检查 skill 质量""改进某个 skill""重构技能说明"，或直接说明要优化哪些方面时使用。默认先审查、再出计划、等待用户确认后再修改目标 skill。不适用于从零创建新 skill（请使用 skill-creator）。",
-  "version" : "v1.6",
+  "description" : "审查并优化现有 skill 的上下文执行可靠性和认知决策质量。完整触发描述见 SKILL.md frontmatter。",
+  "version" : "v2.1",
   "tags" : [ "研发效能" ],
   "basedOn" : "ant_skill_center/skill-optimizer v1.2 by 悟鸣",
-  "changelog" : "v1.6: 正式命名为 Skill Dual Optimizer，新增 README.md，归因声明从 SKILL.md 移至 README。v1.3-v1.5: 基于 v1.2 进行 3 轮双视角自审重构，新增 6 个 reference 文件，SKILL.md 完全重写。"
+  "changelog" : "v2.1: 自审六项修复——①零重复→三分类（无增量重复/执行点强化/红线重申，4处同步）②Gotchas加正向示例（违反自身H2原则）③Quick-fail路径补完（优先修复信号）④模式分类加Hybrid⑤停止标准（防过度优化）⑥Step 4删除偏向修正。v2.0: 定位回归日常Skill——四维度砍为两维度（D1上下文与执行可靠性/D2认知与决策质量），砍掉D1架构业务（原子性/领域耦合/可组合性）和D4工程交付（Token经济学/安全边界/可观测性），有用的检查点（引用文件健康/异常兜底）降级为Gotchas按需触发，输出格式简化（砍评分矩阵/10分制，保留核心定性+问题清单+优化计划），Quick-fail删除薄壳套娃/无兜底策略（不适用日常场景）。v1.9: 四维度框架。v1.8: 三原则+注意力/幻觉/效率。v1.7: 自审第一轮。"
 }
